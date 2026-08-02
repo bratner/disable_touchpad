@@ -22,7 +22,9 @@ const ICON_DISABLED = 'touchpad-disabled-symbolic';
 const TouchpadIndicator = GObject.registerClass(
 class TouchpadIndicator extends PanelMenu.Button {
     _init(extension) {
-        super._init(0.0, _('Touchpad Toggle'), false);
+        // dontCreateMenu=true: PanelMenu.Button otherwise toggles an empty
+        // popup from vfunc_event and never exposes a reliable click signal.
+        super._init(0.0, _('Touchpad Toggle'), true);
 
         this._extension = extension;
 
@@ -31,12 +33,11 @@ class TouchpadIndicator extends PanelMenu.Button {
             style_class: 'system-status-icon',
         });
         this.add_child(this._icon);
-
-        this.connect('button-press-event', this._onButtonPress.bind(this));
     }
 
-    _onButtonPress(_actor, event) {
-        if (event.get_button() === Clutter.BUTTON_PRIMARY) {
+    vfunc_event(event) {
+        if (event.type() === Clutter.EventType.BUTTON_PRESS ||
+            event.type() === Clutter.EventType.TOUCH_BEGIN) {
             this._extension.toggleTouchpad();
             return Clutter.EVENT_STOP;
         }
