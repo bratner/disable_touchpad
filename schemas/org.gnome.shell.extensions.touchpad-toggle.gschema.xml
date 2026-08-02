@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="org.gnome.shell.extensions.touchpad-toggle"
+          path="/org/gnome/shell/extensions/touchpad-toggle/">
+    <key name="toggle-shortcut" type="as">
+      <default>[]</default>
+      <summary>Toggle touchpad shortcut</summary>
+      <description>
+        Keyboard shortcut that toggles the touchpad on or off.
+        Leave empty to disable the shortcut.
+      </description>
+    </key>
+  </schema>
+</schemalist>

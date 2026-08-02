@@ -1,0 +1,11 @@
+{
+    "uuid": "touchpad-toggle@bratner",
+    "name": "Touchpad Toggle",
+    "description": "Toggle the touchpad on or off from the top panel or a keyboard shortcut. Syncs with org.gnome.desktop.peripherals.touchpad send-events.",
+    "shell-version": [
+        "50"
+    ],
+    "url": "https://github.com/bratner/disable_touchpad",
+    "settings-schema": "org.gnome.shell.extensions.touchpad-toggle",
+    "gettext-domain": "touchpad-toggle"
+}
