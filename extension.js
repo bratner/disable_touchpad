@@ -19,6 +19,26 @@ const SHORTCUT_KEY = 'toggle-shortcut';
 const ICON_ENABLED = 'input-touchpad-symbolic';
 const ICON_DISABLED = 'touchpad-disabled-symbolic';
 
+const DEBUG_LOG_PATH = '/tmp/touchpad-toggle.debug.log';
+
+function debugLog(message) {
+    const line = `${new Date().toISOString()} ${message}\n`;
+    console.log(`[touchpad-toggle] ${message}`);
+    try {
+        const file = Gio.File.new_for_path(DEBUG_LOG_PATH);
+        const append = Gio.FileCreateFlags.NONE;
+        let stream;
+        if (file.query_exists(null))
+            stream = file.append_to(append, null);
+        else
+            stream = file.create(append, null);
+        stream.write_all(line, null);
+        stream.close(null);
+    } catch (e) {
+        console.error(`[touchpad-toggle] debug file write failed: ${e}`);
+    }
+}
+
 const TouchpadIndicator = GObject.registerClass(
 class TouchpadIndicator extends PanelMenu.Button {
     _init(extension) {
@@ -36,8 +56,34 @@ class TouchpadIndicator extends PanelMenu.Button {
     }
 
     vfunc_event(event) {
-        if (event.type() === Clutter.EventType.BUTTON_PRESS ||
-            event.type() === Clutter.EventType.TOUCH_BEGIN) {
+        let type;
+        try {
+            type = event.type();
+        } catch (e) {
+            debugLog(`vfunc_event: type() failed: ${e}`);
+            return Clutter.EVENT_PROPAGATE;
+        }
+
+        // Log press/touch only — enter/leave/motion would flood the file.
+        if (type === Clutter.EventType.BUTTON_PRESS ||
+            type === Clutter.EventType.BUTTON_RELEASE ||
+            type === Clutter.EventType.TOUCH_BEGIN ||
+            type === Clutter.EventType.TOUCH_END) {
+            let button = -1;
+            try {
+                button = event.get_button();
+            } catch (_e) {
+                /* touch events have no button */
+            }
+            debugLog(
+                `vfunc_event type=${type} button=${button}` +
+                ` BUTTON_PRESS=${Clutter.EventType.BUTTON_PRESS}` +
+                ` TOUCH_BEGIN=${Clutter.EventType.TOUCH_BEGIN}`);
+        }
+
+        if (type === Clutter.EventType.BUTTON_PRESS ||
+            type === Clutter.EventType.TOUCH_BEGIN) {
+            debugLog('vfunc_event: handling press/touch → toggleTouchpad()');
             this._extension.toggleTouchpad();
             return Clutter.EVENT_STOP;
         }
@@ -53,11 +99,14 @@ class TouchpadIndicator extends PanelMenu.Button {
 
 export default class TouchpadToggleExtension extends Extension {
     enable() {
+        debugLog('enable() starting (debug build)');
         this._settings = this.getSettings();
         this._touchpadSettings = new Gio.Settings({schema_id: TOUCHPAD_SCHEMA});
+        debugLog(`enable() send-events=${this._touchpadSettings.get_string(SEND_EVENTS_KEY)}`);
 
         this._indicator = new TouchpadIndicator(this);
         Main.panel.addToStatusArea(this.uuid, this._indicator);
+        debugLog('enable() indicator added to status area');
 
         this._touchpadChangedId = this._touchpadSettings.connect(
             `changed::${SEND_EVENTS_KEY}`,
@@ -98,8 +147,11 @@ export default class TouchpadToggleExtension extends Extension {
     }
 
     toggleTouchpad() {
-        const next = this.isTouchpadEnabled() ? 'disabled' : 'enabled';
+        const current = this._touchpadSettings.get_string(SEND_EVENTS_KEY);
+        const next = current === 'enabled' ? 'disabled' : 'enabled';
+        debugLog(`toggleTouchpad ${current} -> ${next}`);
         this._touchpadSettings.set_string(SEND_EVENTS_KEY, next);
+        debugLog(`toggleTouchpad after set: ${this._touchpadSettings.get_string(SEND_EVENTS_KEY)}`);
     }
 
     _syncIcon() {
