@@ -26,7 +26,7 @@ UUID: `touchpad-toggle@bratner`
 EXT_DIR="$HOME/.local/share/gnome-shell/extensions/touchpad-toggle@bratner"
 
 mkdir -p "$EXT_DIR"
-cp -r metadata.json extension.js prefs.js schemas icons "$EXT_DIR"/
+cp -r metadata.json extension.js prefs.js schemas icons COPYING "$EXT_DIR"/
 
 glib-compile-schemas "$EXT_DIR/schemas"
 ```
@@ -34,7 +34,9 @@ glib-compile-schemas "$EXT_DIR/schemas"
 ### Option B — pack and install
 
 ```bash
-gnome-extensions pack --force --extra-source=icons
+gnome-extensions pack --force \
+  --extra-source=icons \
+  --extra-source=COPYING
 gnome-extensions install --force touchpad-toggle@bratner.shell-extension.zip
 ```
 
@@ -70,11 +72,33 @@ rm -rf "$HOME/.local/share/gnome-shell/extensions/touchpad-toggle@bratner"
 metadata.json
 extension.js
 prefs.js
+COPYING
 schemas/org.gnome.shell.extensions.touchpad-toggle.gschema.xml
 icons/touchpad-enabled-symbolic.svg
 icons/touchpad-disabled-symbolic.svg
+icons/README.md
 README.md
 ```
 
 Uses the modern ESM `Extension` / `ExtensionPreferences` API
 (GNOME Shell 45+), which is current for GNOME 50.
+
+## License
+
+This extension is free software: you can redistribute it and/or modify it
+under the terms of the GNU General Public License as published by the Free
+Software Foundation; either version 2 of the License, or (at your option)
+any later version. See [`COPYING`](COPYING).
+
+That matches [GNOME Shell](https://gitlab.gnome.org/GNOME/gnome-shell)
+(`GPL-2.0-or-later`) and the
+[extensions.gnome.org](https://gjs.guide/extensions/review-guidelines/review-guidelines.html#licensing)
+requirement that extensions use a GPL-compatible license (commonly
+`GPL-2.0-or-later` or `GPL-3.0-or-later`; Dash to Dock / Ubuntu Dock ship
+GPL-2 the same way).
+
+### Icons
+
+The SVGs under `icons/` are from the **Adwaita** icon theme (GNOME Project),
+licensed under **CC-BY-SA-3.0 or LGPL-3**. Attribution: “GNOME Project”
+(https://www.gnome.org). Details in [`icons/README.md`](icons/README.md).
