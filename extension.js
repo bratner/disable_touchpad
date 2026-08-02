@@ -10,6 +10,7 @@ import St from 'gi://St';
 
 import {Extension, gettext as _} from 'resource:///org/gnome/shell/extensions/extension.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
+import * as MessageTray from 'resource:///org/gnome/shell/ui/messageTray.js';
 import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 
 const TOUCHPAD_SCHEMA = 'org.gnome.desktop.peripherals.touchpad';
@@ -47,27 +48,23 @@ class TouchpadIndicator extends PanelMenu.Button {
             return Clutter.EVENT_PROPAGATE;
         }
 
-        // Log press/touch only — enter/leave/motion would flood the file.
         if (type === Clutter.EventType.BUTTON_PRESS ||
-            type === Clutter.EventType.BUTTON_RELEASE ||
-            type === Clutter.EventType.TOUCH_BEGIN ||
-            type === Clutter.EventType.TOUCH_END) {
+            type === Clutter.EventType.BUTTON_RELEASE) {
             let button = -1;
             try {
                 button = event.get_button();
             } catch (_e) {
-                /* touch events have no button */
+                /* ignore */
             }
             this._extension.debugLog(
                 `vfunc_event type=${type} button=${button}` +
-                ` BUTTON_PRESS=${Clutter.EventType.BUTTON_PRESS}` +
-                ` TOUCH_BEGIN=${Clutter.EventType.TOUCH_BEGIN}`);
+                ` PRIMARY=${Clutter.BUTTON_PRIMARY}`);
         }
 
-        if (type === Clutter.EventType.BUTTON_PRESS ||
-            type === Clutter.EventType.TOUCH_BEGIN) {
+        if (type === Clutter.EventType.BUTTON_PRESS &&
+            event.get_button() === Clutter.BUTTON_PRIMARY) {
             this._extension.debugLog(
-                'vfunc_event: handling press/touch → toggleTouchpad()');
+                'vfunc_event: left-click → toggleTouchpad()');
             this._extension.toggleTouchpad();
             return Clutter.EVENT_STOP;
         }
@@ -85,6 +82,9 @@ export default class TouchpadToggleExtension extends Extension {
     enable() {
         this._settings = this.getSettings();
         this._touchpadSettings = new Gio.Settings({schema_id: TOUCHPAD_SCHEMA});
+        this._notification = null;
+        this._notificationSource = null;
+
         this.debugLog('enable() starting');
         this.debugLog(
             `enable() send-events=${this._touchpadSettings.get_string(SEND_EVENTS_KEY)}`);
@@ -95,7 +95,7 @@ export default class TouchpadToggleExtension extends Extension {
 
         this._touchpadChangedId = this._touchpadSettings.connect(
             `changed::${SEND_EVENTS_KEY}`,
-            () => this._syncIcon());
+            () => this._onTouchpadChanged());
         this._syncIcon();
 
         this._addKeybinding();
@@ -112,6 +112,7 @@ export default class TouchpadToggleExtension extends Extension {
 
     disable() {
         this._removeKeybinding();
+        this._dismissNotification();
 
         if (this._shortcutChangedId) {
             this._settings.disconnect(this._shortcutChangedId);
@@ -126,6 +127,7 @@ export default class TouchpadToggleExtension extends Extension {
         this._indicator?.destroy();
         this._indicator = null;
 
+        this._destroyNotificationSource();
         this._touchpadSettings = null;
         this._settings = null;
     }
@@ -161,11 +163,84 @@ export default class TouchpadToggleExtension extends Extension {
             `toggleTouchpad after set: ${this._touchpadSettings.get_string(SEND_EVENTS_KEY)}`);
     }
 
+    enableTouchpad() {
+        if (this.isTouchpadEnabled())
+            return;
+        this.debugLog('enableTouchpad()');
+        this._touchpadSettings.set_string(SEND_EVENTS_KEY, 'enabled');
+    }
+
+    _onTouchpadChanged() {
+        this._syncIcon();
+        if (this.isTouchpadEnabled())
+            this._dismissNotification();
+        else if (!this._notification)
+            this._notifyTouchpadDisabled();
+    }
+
+    _getNotificationSource() {
+        if (this._notificationSource)
+            return this._notificationSource;
+
+        this._notificationSource = new MessageTray.Source({
+            title: _('Touchpad Toggle'),
+            iconName: ICON_DISABLED,
+        });
+        this._notificationSource.connect('destroy', () => {
+            this._notificationSource = null;
+            this._notification = null;
+        });
+        Main.messageTray.add(this._notificationSource);
+        return this._notificationSource;
+    }
+
     _notifyTouchpadDisabled() {
-        Main.notify(
-            _('Touchpad Toggle'),
-            _('Touchpad is disabled. Click on this ICON to enable.'));
-        this.debugLog('showed touchpad-disabled notification');
+        this._dismissNotification();
+
+        const source = this._getNotificationSource();
+        const notification = new MessageTray.Notification({
+            source,
+            title: _('Touchpad Toggle'),
+            body: _('Touchpad is disabled. Click on this ICON to enable.'),
+            gicon: new Gio.ThemedIcon({name: ICON_DISABLED}),
+            urgency: MessageTray.Urgency.NORMAL,
+            isTransient: false,
+        });
+
+        notification.connect('activated', () => {
+            this.debugLog('notification activated → enableTouchpad()');
+            this.enableTouchpad();
+        });
+        notification.addAction(_('Enable'), () => {
+            this.debugLog('notification Enable action → enableTouchpad()');
+            this.enableTouchpad();
+        });
+        notification.connect('destroy', () => {
+            if (this._notification === notification)
+                this._notification = null;
+        });
+
+        this._notification = notification;
+        source.addNotification(notification);
+        this.debugLog('showed persistent touchpad-disabled notification');
+    }
+
+    _dismissNotification() {
+        if (!this._notification)
+            return;
+        this.debugLog('dismissing notification');
+        this._notification.destroy(
+            MessageTray.NotificationDestroyedReason.SOURCE_CLOSED);
+        this._notification = null;
+    }
+
+    _destroyNotificationSource() {
+        this._dismissNotification();
+        if (this._notificationSource) {
+            this._notificationSource.destroy(
+                MessageTray.NotificationDestroyedReason.SOURCE_CLOSED);
+            this._notificationSource = null;
+        }
     }
 
     _syncIcon() {
