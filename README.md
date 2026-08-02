@@ -78,10 +78,16 @@ icons/touchpad-enabled-symbolic.svg
 icons/touchpad-disabled-symbolic.svg
 icons/README.md
 README.md
+TESTING.md
 ```
 
 Uses the modern ESM `Extension` / `ExtensionPreferences` API
 (GNOME Shell 45+), which is current for GNOME 50.
+
+## Testing
+
+See [TESTING.md](TESTING.md) for the manual test plan (panel toggle,
+gsettings sync, preferences shortcut, lifecycle, and Wayland/X11 notes).
 
 ## License
 
