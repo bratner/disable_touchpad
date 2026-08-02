@@ -11,6 +11,7 @@ import {ExtensionPreferences, gettext as _} from
     'resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js';
 
 const SHORTCUT_KEY = 'toggle-shortcut';
+const DEBUG_LOGGING_KEY = 'debug-logging';
 
 const ShortcutButton = GObject.registerClass({
     Properties: {
@@ -178,6 +179,24 @@ export default class TouchpadTogglePreferences extends ExtensionPreferences {
         const button = new ShortcutButton(settings);
         row.add_suffix(button);
         row.activatable_widget = button;
+
+        const debugGroup = new Adw.PreferencesGroup({
+            title: _('Diagnostics'),
+        });
+        page.add(debugGroup);
+
+        const debugRow = new Adw.SwitchRow({
+            title: _('Debug Logging'),
+            subtitle: _(
+                'Write diagnostic messages to the system log and ' +
+                '/tmp/touchpad-toggle.debug.log'),
+        });
+        debugGroup.add(debugRow);
+        settings.bind(
+            DEBUG_LOGGING_KEY,
+            debugRow,
+            'active',
+            Gio.SettingsBindFlags.DEFAULT);
 
         const hintGroup = new Adw.PreferencesGroup({
             title: _('About'),

@@ -10,5 +10,13 @@
         Leave empty to disable the shortcut.
       </description>
     </key>
+    <key name="debug-logging" type="b">
+      <default>false</default>
+      <summary>Debug logging</summary>
+      <description>
+        When enabled, write diagnostic messages to the system log and
+        /tmp/touchpad-toggle.debug.log.
+      </description>
+    </key>
   </schema>
 </schemalist>
