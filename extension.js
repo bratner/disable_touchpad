@@ -12,6 +12,7 @@ import {Extension, gettext as _} from 'resource:///org/gnome/shell/extensions/ex
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as MessageTray from 'resource:///org/gnome/shell/ui/messageTray.js';
 import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
+import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 
 const TOUCHPAD_SCHEMA = 'org.gnome.desktop.peripherals.touchpad';
 const SEND_EVENTS_KEY = 'send-events';
@@ -26,11 +27,20 @@ const DEBUG_LOG_PATH = '/tmp/touchpad-toggle.debug.log';
 const TouchpadIndicator = GObject.registerClass(
 class TouchpadIndicator extends PanelMenu.Button {
     _init(extension) {
-        // dontCreateMenu=true: PanelMenu.Button otherwise toggles an empty
-        // popup from vfunc_event and never exposes a reliable click signal.
+        // dontCreateMenu=true avoids the default left-click menu toggle;
+        // we attach our own menu and open it only on right-click.
         super._init(0.0, _('Touchpad Toggle'), true);
 
         this._extension = extension;
+
+        this.setMenu(new PopupMenu.PopupMenu(this, 0.0, St.Side.TOP));
+        // setMenu() re-enables PanelMenu's ClickGesture; keep left-click free.
+        this._clickGesture.set_enabled(false);
+
+        this.menu.addAction(_('Preferences'), () => {
+            this._extension.debugLog('menu: Preferences');
+            this._extension.openPreferences();
+        });
 
         this._icon = new St.Icon({
             icon_name: ICON_ENABLED,
@@ -48,26 +58,28 @@ class TouchpadIndicator extends PanelMenu.Button {
             return Clutter.EVENT_PROPAGATE;
         }
 
-        if (type === Clutter.EventType.BUTTON_PRESS ||
-            type === Clutter.EventType.BUTTON_RELEASE) {
-            let button = -1;
-            try {
-                button = event.get_button();
-            } catch (_e) {
-                /* ignore */
-            }
-            this._extension.debugLog(
-                `vfunc_event type=${type} button=${button}` +
-                ` PRIMARY=${Clutter.BUTTON_PRIMARY}`);
-        }
+        if (type !== Clutter.EventType.BUTTON_PRESS)
+            return Clutter.EVENT_PROPAGATE;
 
-        if (type === Clutter.EventType.BUTTON_PRESS &&
-            event.get_button() === Clutter.BUTTON_PRIMARY) {
-            this._extension.debugLog(
-                'vfunc_event: left-click → toggleTouchpad()');
+        const button = event.get_button();
+        this._extension.debugLog(
+            `vfunc_event BUTTON_PRESS button=${button}` +
+            ` PRIMARY=${Clutter.BUTTON_PRIMARY}` +
+            ` SECONDARY=${Clutter.BUTTON_SECONDARY}`);
+
+        if (button === Clutter.BUTTON_PRIMARY) {
+            this.menu.close();
+            this._extension.debugLog('vfunc_event: left-click → toggleTouchpad()');
             this._extension.toggleTouchpad();
             return Clutter.EVENT_STOP;
         }
+
+        if (button === Clutter.BUTTON_SECONDARY) {
+            this._extension.debugLog('vfunc_event: right-click → menu.toggle()');
+            this.menu.toggle();
+            return Clutter.EVENT_STOP;
+        }
+
         return Clutter.EVENT_PROPAGATE;
     }
 
@@ -201,7 +213,7 @@ export default class TouchpadToggleExtension extends Extension {
         const notification = new MessageTray.Notification({
             source,
             title: _('Touchpad Toggle'),
-            body: _('Touchpad is disabled. Click on this ICON to enable.'),
+            body: _('Touchpad is disabled. Click here or in the top bar to enable it back.'),
             gicon: new Gio.ThemedIcon({name: ICON_DISABLED}),
             urgency: MessageTray.Urgency.NORMAL,
             isTransient: false,
