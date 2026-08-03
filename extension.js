@@ -33,8 +33,17 @@ class TouchpadIndicator extends PanelMenu.Button {
 
         this._extension = extension;
 
-        this.setMenu(new PopupMenu.PopupMenu(this, 0.0, St.Side.TOP));
         // setMenu() re-enables PanelMenu's ClickGesture; keep left-click free.
+        this.setMenu(new PopupMenu.PopupMenu(this, 0.0, St.Side.TOP));
+        
+        // NOTE: _clickGesture is a private/internal property of PanelMenu.Button,
+        // not part of GNOME Shell's public extension API. It has worked on
+        // GNOME Shell 50.1 as of writing, but GNOME could rename or restructure
+        // it in a future release without notice. If left-click ever stops
+        // toggling the touchpad (or right-click stops opening the menu) after
+        // a GNOME Shell upgrade, this is the first place to check — the fix
+        // would be to find whatever GNOME now calls this internal gesture
+        // object, or to rework click handling without relying on it at all.
         this._clickGesture.set_enabled(false);
 
         this.menu.addAction(_('Preferences'), () => {
